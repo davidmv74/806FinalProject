@@ -11,6 +11,7 @@ import pdb
 import gzip
 import numpy as np
 import random
+from evaluation import Evaluation
 
 # DAN MODEL
 class DAN(nn.Module):
@@ -62,8 +63,8 @@ def run_batch(lines, idToQuestions, embeddings, model):
 
 # Trains a model by calling run_batch on the lines passed,
 def train_model(lines, idToQuestions, embeddings, model):
-    learning_rate = 0.05
-    optimizer = torch.optim.Adam(model.parameters(), lr = 10**-1, weight_decay=10**-3)
+    learning_rate = 10**-3
+    optimizer = torch.optim.Adam(model.parameters(), lr = 10**-3, weight_decay=10**-2)
     batchSize = len(lines)
     encodings = run_batch(lines, idToQuestions, embeddings, model)
     y = [0]*batchSize
@@ -84,11 +85,37 @@ def train_model(lines, idToQuestions, embeddings, model):
     y = Variable(torch.LongTensor(y))
     x = x.view(y.data.size(0), -1)
     loss = criterion(x, y)
-    print(loss)
     loss.backward()
     optimizer.step()
     for p in model.parameters():
         p.data.add_(-learning_rate, p.grad.data)
+    return loss.data[0]
+
+#test on dev
+def testing(filee, numSamples, model, idToQuestions, embeddings):
+    with open(filee, 'r') as f:
+        lines = f.readlines()
+        random.shuffle(lines)
+        lines = lines[:numSamples]
+        cos = nn.CosineSimilarity(dim=0, eps=1e-6)
+        allRanks = []
+        for line in lines:
+            splitLines = line.split("\t")
+            refQ = model.forward(Variable(torch.FloatTensor(getQuestionEmbedding(splitLines[0], idToQuestions, embeddings))))
+            candidatesCosine = []
+            for i in range(20):
+                candidateId = splitLines[2].split(" ")[i]
+                candidateEncoding = model.forward(Variable(torch.FloatTensor(getQuestionEmbedding(candidateId, idToQuestions, embeddings))))
+                candidatesCosine.append((candidateId,cos(refQ, candidateEncoding).data[0]))
+            sortedCosines = sorted(candidatesCosine, key = lambda x: x[1], reverse=True)
+            sortedRanks = [splitLines[2].split(" ").index(cand[0])  for cand in sortedCosines]
+            zeroOrOne = [1 if cand[0] in splitLines[1] else 0 for cand in sortedCosines]
+            allRanks.append(zeroOrOne)
+        evaluation = Evaluation(allRanks)
+        print("MAP", evaluation.MAP())
+        print("MRR", evaluation.MRR())
+        print("P@1", evaluation.Precision(1))
+
 
 # Get all the questions associated to an id
 idToQuestions = {}
@@ -110,21 +137,16 @@ with open('train_random.txt', 'r') as f:
     length = len(lines)
     batch_size = int(length/53)
     model = DAN()
-    for i in range(10):
-        print(i)
-        liness = lines[i*batch_size:(i+1)*batch_size]
-        train_model(liness, idToQuestions, embeddings, model)
-
-#test on dev
-with open('dev.txt', 'r') as f:
-    lines = f.readlines()
-    cos = nn.CosineSimilarity(dim=0, eps=1e-6)
-    for line in lines:
-        splitLines = line.split("\t")
-        refQ = model.forward(Variable(torch.FloatTensor(getQuestionEmbedding(splitLines[0], idToQuestions, embeddings))))
-        candidatesCosine = []
-        for i in range(20):
-            candidateId = splitLines[2].split(" ")[i]
-            candidateEncoding = model.forward(Variable(torch.FloatTensor(getQuestionEmbedding(candidateId, idToQuestions, embeddings))))
-            candidatesCosine.append((candidateId,cos(refQ, candidateEncoding).data[0]))
-        print(sorted(candidatesCosine, key = lambda x: x[1], reverse=True))
+    epochs = 5
+    batches = 7
+    for j in range(epochs):
+        print("EPOCH:", j)
+        loss = 0
+        random.shuffle(lines)
+        for i in range(batches):
+            print("BATCH:",i)
+            liness = lines[i*batch_size:(i+1)*batch_size]
+            loss += train_model(liness, idToQuestions, embeddings, model)
+        loss /= batches
+        print("Loss for epoch", i, loss)
+        testing('dev.txt', 1000, model, idToQuestions, embeddings)
