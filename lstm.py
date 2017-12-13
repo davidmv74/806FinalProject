@@ -29,7 +29,7 @@ import parser
         hidden = F.tanh(self.W_input(review_features)) # 200 -> hidden_dim
         return hidden'''
 
-rnn = nn.LSTM(input_size=200, hidden_size=120, num_layers=1, dropout=0.2)
+rnn = nn.LSTM(input_size=200, hidden_size=180, num_layers=1, dropout=0.2)
 
 def train_model(train_data, model, lr, wd, epochs, batch_size, num_tests):
     optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=wd)
@@ -87,14 +87,14 @@ def testing(model, dev_data):
             #print "refQ", refQ
             refQ = model.forward(Variable(torch.FloatTensor(\
                                 [refQ])))[0]
-            refQ = torch.mean(refQ[:,:200,:], dim=1).view(120,1)
+            refQ = torch.mean(refQ[:,:200,:], dim=1).view(180,1)
             candidates = dev_sample['candidates']
             candidateIds = [x[0] for x in candidates]
             candidatesCosine = []
             for i in range(len(candidates)):
                 cand = candidates[i][1].data.numpy().astype(float)
                 candidateEncoding = model.forward(Variable(torch.FloatTensor([cand])))[0]
-                candidateEncoding = torch.mean(candidateEncoding[:,:200,:], dim=1).view(120,1)
+                candidateEncoding = torch.mean(candidateEncoding[:,:200,:], dim=1).view(180,1)
                 #print "candidateEncoding", candidateEncoding
                 candidatesCosine.append((candidates[i][0],cos(refQ, candidateEncoding).data[0]))
             sortedCosines = sorted(candidatesCosine, key = lambda x: x[1], reverse=True)
@@ -112,10 +112,10 @@ embeddings = parser.get_embeddings('vectors_pruned.200.txt.gz')
 idQuestionsDict = parser.get_questions_id("text_tokenized.txt.gz")
 
 # train
-print("Getting 200 Train Samples...")
+print("Getting ALL Train Samples...")
 label_train_data = parser.get_training_vectors(idQuestionsDict, embeddings)
 model = rnn
-train_model(label_train_data, model, 0.001, 0, 2, 40, 1000)
+train_model(label_train_data, model, 0.001, 0, 1, 40, 1000)
 
 
 '''
