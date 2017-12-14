@@ -14,22 +14,14 @@ import random
 from evaluation import Evaluation
 import parser
 
-# DAN MODEL
-'''class DAN(nn.Module):
+inp = 200
+h = 240
+rnn = nn.LSTM(input_size=inp, hidden_size=h, num_layers=1, dropout=0.2)
 
-    def __init__(self):
-        super(DAN, self).__init__()
+'''class LSTM(nn.Module):
 
-        embed_dim = 200     # 200 Initial States
-        hidden_dim = embed_dim      # Also 200 hidden states, we could change this as hyper parameter (they use around 250 on paper)
+    def __init__(self, input_size, output_size):'''
 
-        self.W_input = nn.Linear(embed_dim, hidden_dim)
-
-    def forward(self, review_features):
-        hidden = F.tanh(self.W_input(review_features)) # 200 -> hidden_dim
-        return hidden'''
-
-rnn = nn.LSTM(input_size=200, hidden_size=180, num_layers=1, dropout=0.2)
 
 def train_model(train_data, model, lr, wd, epochs, batch_size, num_tests):
     optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=wd)
@@ -39,8 +31,8 @@ def train_model(train_data, model, lr, wd, epochs, batch_size, num_tests):
         result = run_epoch(train_data, model, optimizer, batch_size)
         print('Train MML loss: {:.6f}'.format(result))
         print(" ")
-        dev_data = parser.get_development_vectors(idQuestionsDict, embeddings, num_tests)
-        testing(model, dev_data)
+        test_data = parser.get_testing_vectors(idQuestionsDict, embeddings, num_tests)
+        testing(model, test_data)
 
 def run_epoch(data, model, optimizer, size):
     #Train model for one pass of train data, and return loss, acccuracy
@@ -50,18 +42,25 @@ def run_epoch(data, model, optimizer, size):
     for i in tqdm(range(numBatches)):
         batch = data[i*size:(i+1)*size]
         optimizer.zero_grad()
-        encodings = model.forward(Variable(torch.FloatTensor(batch)))[0]
+        #print "batch", np.array(batch).shape
+        #encodings = model.forward(Variable(torch.FloatTensor(batch)))[0]
+        #print "encodings", encodings
         y = [0]*size
         x = []
         criterion = nn.MultiMarginLoss()
         for j in range(size):
-            sampleEncodings = encodings[j]
-            #print "sampleEnc", sampleEncodings
-            refQ = sampleEncodings[0]
+            sampleBatch = batch[j]
+            #print "sampleBatch", sampleBatch
+            refQ = torch.from_numpy(sampleBatch[0]).view(1,1,inp).float()
+            refQ = model.forward(Variable(refQ))[0]
+            #print "refQ", refQ
+            #refQ = torch.mean(refQ, dim=0).view(h,1)
             distance_vector = [ ]
             input1 = refQ
             for k in range(1,22):
-                input2 = sampleEncodings[k]
+                input2 = torch.from_numpy(sampleBatch[k]).view(1,1,inp).float()
+                input2 = model.forward(Variable(input2))[0]
+                input2 = torch.mean(input2, dim=0).view(h,1)
                 cos = nn.CosineSimilarity(dim=0, eps=1e-6)
                 dist = cos(input1, input2)
                 #print "dist", dist
@@ -79,22 +78,24 @@ def run_epoch(data, model, optimizer, size):
     return avg_loss
 
 #test on dev
-def testing(model, dev_data):
+def testing(model, test_data):
         cos = nn.CosineSimilarity(dim=1, eps=1e-6)
         allRanks = []
-        for dev_sample in dev_data:
+        for dev_sample in test_data:
             refQ = dev_sample['refq'].data.numpy().astype(float)
-            #print "refQ", refQ
+            #print "sample", refQ
             refQ = model.forward(Variable(torch.FloatTensor(\
                                 [refQ])))[0]
-            refQ = torch.mean(refQ[:,:200,:], dim=1).view(180,1)
+            #print "refQ", refQ[0]
+            refQ = torch.mean(refQ[0], dim=0).view(h,1)
+            #print "refQ mean", refQ
             candidates = dev_sample['candidates']
             candidateIds = [x[0] for x in candidates]
             candidatesCosine = []
             for i in range(len(candidates)):
                 cand = candidates[i][1].data.numpy().astype(float)
                 candidateEncoding = model.forward(Variable(torch.FloatTensor([cand])))[0]
-                candidateEncoding = torch.mean(candidateEncoding[:,:200,:], dim=1).view(180,1)
+                candidateEncoding = torch.mean(candidateEncoding[0], dim=0).view(h,1)
                 #print "candidateEncoding", candidateEncoding
                 candidatesCosine.append((candidates[i][0],cos(refQ, candidateEncoding).data[0]))
             sortedCosines = sorted(candidatesCosine, key = lambda x: x[1], reverse=True)
@@ -105,6 +106,7 @@ def testing(model, dev_data):
         print("MAP", evaluation.MAP())
         print("MRR", evaluation.MRR())
         print("P@1", evaluation.Precision(1))
+        print("P@5", evaluation.Precision(5))
 
 #get all word embeddings
 print("Getting Word Embeddings...")
@@ -115,7 +117,7 @@ idQuestionsDict = parser.get_questions_id("text_tokenized.txt.gz")
 print("Getting ALL Train Samples...")
 label_train_data = parser.get_training_vectors(idQuestionsDict, embeddings)
 model = rnn
-train_model(label_train_data, model, 0.001, 0, 1, 40, 1000)
+train_model(label_train_data, model, 0.001, 0, 4, 40, 1000)
 
 
 '''
