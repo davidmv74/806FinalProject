@@ -32,7 +32,7 @@ class DAN(nn.Module):
         hidden = F.tanh(self.W_input(review_features)) # 200 -> hidden_dim
         return hidden
 
-def train_model(idToQuestions, embeddings, train_data, model, lr, wd, epochs, batch_size, num_tests, transfer= False):
+def train_model(idToQuestions, embeddings, train_data, model, lr, wd, epochs, batch_size, transfer= False):
     optimizer = torch.optim.Adam(model.parameters(), lr = lr, weight_decay=wd)
 
     for epoch in range(1, epochs+1):
@@ -41,10 +41,16 @@ def train_model(idToQuestions, embeddings, train_data, model, lr, wd, epochs, ba
         print('Train MML loss: {:.6f}'.format(result))
         print(" ")
         if not transfer:
-            dev_data = parser.get_development_vectors(idToQuestions, embeddings, num_tests)
+            print(num_tests)
+            dev_data = parser.get_development_vectors('dev.txt', idToQuestions, embeddings)
+            test_data = parser.get_development_vectors('test.txt', idToQuestions, embeddings)
+            print("DEV")
             testing(model, dev_data)
+            print("TEST")
+            testing(model, test_data)
         else:
-            dev_data = parser.get_android_samples('dev.neg.txt', 'dev.pos.txt', embeddings, idToQuestions, num_tests)
+            dev_data = parser.get_android_samples('dev.neg.txt', 'dev.pos.txt', embeddings, idToQuestions, 500)
+            part_two.testing_android_temp(model, dev_data)
             part_two.testing_android(model, dev_data)
 
 def run_epoch(data, model, optimizer, size):
@@ -66,8 +72,8 @@ def run_epoch(data, model, optimizer, size):
             refQ = sampleEncodings[0]
             distance_vector = [ ]
             input1 = refQ
-            for j in range(1,22):
-                input2 = sampleEncodings[j]
+            for k in range(1,22):
+                input2 = sampleEncodings[k]
                 cos = nn.CosineSimilarity(dim=0, eps=1e-6)
                 dist = cos(input1, input2)
                 distance_vector.append(dist)
@@ -118,6 +124,8 @@ if __name__ == "__main__":
     vocabulary = vectorizer.get_feature_names()
     vocabulary = dict(zip(vocabulary, range(len(vocabulary))))
 
+    labelModel = DAN()
+
     # get all word embeddings
     print("Getting Word Embeddings...")
     embeddings = parser.get_embeddings('vectors_pruned.200.txt.gz', vocabulary)
@@ -126,6 +134,5 @@ if __name__ == "__main__":
     print("Getting 2000 Train Samples...")
     label_train_data = parser.get_training_vectors(idToQuestionsUbuntu, embeddings)
 
-    labelModel = DAN()
     print("Training Model...")
-    train_model(idToQuestionsUbuntu, embeddings, label_train_data, labelModel, 0.001, 0, 3, 60, 1000)
+    train_model(idToQuestionsUbuntu, embeddings, label_train_data, labelModel, 0.001, 0, 5, 80)
