@@ -18,7 +18,7 @@ def get_training_vectors(idToQuestions, embeddings):
     with open('train_random.txt', 'r') as f:
         lines = f.readlines()
         random.shuffle(lines)
-        lines = lines[:1000]
+        lines = lines[:4000]
         for line in tqdm(lines):
             splitLine = line.split("\t")
             negatives = splitLine[2][:-1].split(" ")
@@ -33,22 +33,23 @@ def get_training_vectors(idToQuestions, embeddings):
                 training_data.append(embeddingsList)
     return training_data
 
-def get_development_vectors(idToQuestions, embeddings, size):
+def get_development_vectors(filee, idToQuestions, embeddings):
     dev_data = []
-    with open('dev.txt', 'rb') as f:
+    embed_size = len(embeddings["dog"])
+    with open(filee, 'rb') as f:
         lines = f.readlines()
         random.shuffle(lines)
-        lines = lines[:size]
+        lines = lines
         for line in tqdm(lines):
             lineEmbeddings = {}
             splitLines = line.split("\t")
-            refQ = Variable(torch.FloatTensor(get_question_embedding(splitLines[0], idToQuestions, embeddings)))
+            refQ = Variable(torch.FloatTensor(get_question_embedding(splitLines[0], idToQuestions, embeddings, embed_size)))
             lineEmbeddings['refq'] = refQ
             candidateEmbeddings = []
             lineEmbeddings['positives'] = splitLines[1]
             for i in range(20):
                 candidateId = splitLines[2].split(" ")[i]
-                candidateEmbeddings.append((candidateId,Variable(torch.FloatTensor(get_question_embedding(candidateId, idToQuestions, embeddings)))))
+                candidateEmbeddings.append((candidateId,Variable(torch.FloatTensor(get_question_embedding(candidateId, idToQuestions, embeddings, embed_size)))))
             lineEmbeddings['candidates'] =candidateEmbeddings
             dev_data.append(lineEmbeddings)
     return dev_data
@@ -127,16 +128,15 @@ def get_android_samples(negFile, posFile, embeddings, idToQuestions, size):
     random.shuffle(posPairsList)
     posPairsList = posPairsList[:size]
     samples = []
-    for qPair in posPairsList:
+    for qPair in tqdm(posPairsList):
         target = []
         random.shuffle(qPair[1])
-        posCands = qPair[1][:40]
-        random.shuffle(negPairs[qPair[0]])
-        negCands = negPairs[qPair[0]][:max(len(posCands), 10)]
+        posCands = qPair[1]
+        negCands = negPairs[qPair[0]][:100]
+        random.shuffle(negCands)
         posCands = [(get_question_embedding(x, idToQuestions, embeddings, embed_size), 1) for x in posCands]
         negCands = [(get_question_embedding(x, idToQuestions, embeddings, embed_size), 0) for x in negCands]
         cands = posCands+negCands
         random.shuffle(cands)
-        cands = cands[:20]
         samples.append(cands)
     return samples
