@@ -15,8 +15,7 @@ from evaluation import Evaluation
 import parser
 import meter
 from sklearn.feature_extraction.text import CountVectorizer
-import part_one
-import lstm
+import part_one_dan
 
 # DAN MODEL
 class DAN(nn.Module):
@@ -61,8 +60,8 @@ def train_adversarial_model(idToQuestions, embeddings,label_train_data, domain_t
         print(" ")
 
         dev_data = parser.get_android_samples('dev.neg.txt', 'dev.pos.txt', embeddings, idToQuestions, num_tests)
-        testing_android_temp(label_model, dev_data)
-        testing_android(label_model, dev_data)
+        testing_android_eval(label_model, dev_data)
+        testing_android_auc(label_model, dev_data)
 
 
 def run_adversarial_epoch(label_train_data, domain_train_data, label_model, domain_model, domain_optimizer, label_optimizer, size):
@@ -113,26 +112,7 @@ def run_adversarial_epoch(label_train_data, domain_train_data, label_model, doma
     avg_loss = np.mean(losses)
     return avg_loss
 
-def testing_android_lstm(model, test_data):
-    cos = nn.CosineSimilarity(dim=0, eps=1e-6)
-    auc = meter.AUCMeter()
-    for dev_sample in test_data:
-        target = [x[1] for x in dev_sample[1:]]
-        embeddings = [x[0] for x in dev_sample]
-        refQ = model.forward(Variable(torch.FloatTensor(embeddings[0])))
-        refQ = embeddings[0].numpy().astype(float)
-        #print "sample", refQ
-        refQ = model.forward(Variable(torch.FloatTensor(\
-                            [refQ])))[0]
-        candidates = embeddings[1:]
-        candidatesCosine = []
-        for i in range(len(candidates)):
-            candidateEncoding = model.forward(Variable(torch.FloatTensor(candidates[i])))
-            candidatesCosine.append(cos(refQ, candidateEncoding).data[0])
-        auc.add(np.array(candidatesCosine), np.array(target))
-    print(auc.value(0.05))
-
-def testing_android(model,test_data):
+def testing_android_auc(model,test_data):
     cos = nn.CosineSimilarity(dim=0, eps=1e-6)
     auc = meter.AUCMeter()
     for dev_sample in test_data:
@@ -147,7 +127,7 @@ def testing_android(model,test_data):
         auc.add(np.array(candidatesCosine), np.array(target))
     print(auc.value(0.05))
 
-def testing_android_temp(model, test_data):
+def testing_android_eval(model, test_data):
     cos = nn.CosineSimilarity(dim=0, eps=1e-6)
     allRanks = []
     for dev_sample in test_data:
@@ -217,27 +197,25 @@ if __name__ == "__main__":
 
     # get all word embeddings
     print("Getting Glove Embeddings...")
-    embeddings = parser.get_embeddings('glove.840B.300d.txt', vocabulary)
-    #embeddings = parser.get_embeddings('vectors_pruned.200.txt.gz', vocabulary)
-    # train
+    embeddings = parser.get_embeddings('vectors_pruned.200.txt.gz', vocabulary)
+
+    # train data
     print("Getting 2000 Train Samples...")
     label_train_data = parser.get_training_vectors(idToQuestionsUbuntu, embeddings)
 
     labelModel = DAN()
     domainModel = Net()
+
     print("Getting Domain Classification Pairs...")
     domain_train_data = parser.get_domain_train_vectors(idToQuestionsUbuntu, idToQuestionsAndroid, embeddings, len(label_train_data))
     print("Getting Development Samples...")
-    #dev_data = parser.get_android_samples('dev.neg.txt', 'dev.pos.txt', embeddings, idToQuestionsAndroid, 2000)
-    print("HERE")
-    #inp = 299
-    #h = 240
-    #labelModel = nn.LSTM(input_size=inp, hidden_size=h, num_layers=1, dropout=0.2)
+    dev_data = parser.get_android_samples('dev.neg.txt', 'dev.pos.txt', embeddings, idToQuestionsAndroid, 2000)
+
     # Part 2 Milestone 1.a) Unsupervised running on Android dataset
-    #unsupervised_test(dev_data)
+    unsupervised_test(dev_data)
 
     # Part 2 Milestone 1.b)
-    #part_one.train_model(idToQuestionsAndroid, embeddings, label_train_data, labelModel, 0.001, 0, 5, 80, True)
+    part_one.train_model(idToQuestionsAndroid, embeddings, label_train_data, labelModel, 0.001, 0, 5, 80, True)
 
     # Part 2 Milestine 2
     train_adversarial_model(idToQuestionsAndroid, embeddings, label_train_data, domain_train_data, labelModel, domainModel, 0.001, 0, 5, 40, 1000)

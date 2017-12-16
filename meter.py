@@ -93,7 +93,6 @@ class AUCMeter(Meter):
 
         tpr /= (self.targets.sum() * 1.0)
         fpr /= ((self.targets - 1.0).sum() * -1.0)
-
         for n in range(1, scores.size + 1):
             if fpr[n] >= max_fpr:
                 break
