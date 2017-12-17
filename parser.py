@@ -18,7 +18,7 @@ def get_training_vectors(idToQuestions, embeddings):
     with open('train_random.txt', 'r') as f:
         lines = f.readlines()
         random.shuffle(lines)
-        lines = lines[:4000]
+        lines = lines[:2000]
         for line in tqdm(lines):
             splitLine = line.split("\t")
             negatives = splitLine[2][:-1].split(" ")
@@ -129,14 +129,13 @@ def get_android_samples(negFile, posFile, embeddings, idToQuestions, size):
     posPairsList = posPairsList[:size]
     samples = []
     for qPair in tqdm(posPairsList):
+        cands = []
+        cands.append((get_question_embedding(qPair[0], idToQuestions, embeddings, embed_size), 1))
         target = []
-        random.shuffle(qPair[1])
         posCands = qPair[1]
-        negCands = negPairs[qPair[0]][:100]
-        random.shuffle(negCands)
+        negCands = negPairs[qPair[0]]
         posCands = [(get_question_embedding(x, idToQuestions, embeddings, embed_size), 1) for x in posCands]
         negCands = [(get_question_embedding(x, idToQuestions, embeddings, embed_size), 0) for x in negCands]
-        cands = posCands+negCands
-        random.shuffle(cands)
+        cands += posCands+negCands
         samples.append(cands)
     return samples

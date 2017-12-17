@@ -59,7 +59,7 @@ def train_adversarial_model(idToQuestions, embeddings,label_train_data, domain_t
         print('Train MML loss: {:.6f}'.format(result))
         print(" ")
 
-        dev_data = parser.get_android_samples('dev.neg.txt', 'dev.pos.txt', embeddings, idToQuestions, num_tests)
+        dev_data = parser.get_android_samples('test.neg.txt', 'test.pos.txt', embeddings, idToQuestions, num_tests)
         testing_android_eval(label_model, dev_data)
         testing_android_auc(label_model, dev_data)
 
@@ -105,8 +105,6 @@ def run_adversarial_epoch(label_train_data, domain_train_data, label_model, doma
         totalLoss.backward()
         label_optimizer.step()
         domain_optimizer.step()
-        print(domain_loss.data[0])
-        print(label_loss.data[0])
         losses.append(totalLoss.data[0])
     # Calculate epoch level scores
     avg_loss = np.mean(losses)
@@ -180,7 +178,6 @@ def unsupervised_test(test_data):
         auc.add(np.array(candidatesCosine), np.array(target))
     print(auc.value(0.05))
 
-
 if __name__ == "__main__":
     # Get all the questions associated to an id from each data set
     print("Getting Ubuntu Dataset...")
@@ -190,14 +187,14 @@ if __name__ == "__main__":
 
     print("Getting Words in datasets...")
     vectorizer = CountVectorizer(ngram_range=(1,1), token_pattern=r"\b\w+\b")
-    files = gzip.open('text_tokenized.txt.gz', 'rb').readlines()+ gzip.open('corpus.tsv.gz', 'rb').readlines()
+    files = gzip.open('corpus.tsv.gz', 'rb').readlines()
     vocabulary = vectorizer.fit_transform(files)
     vocabulary = vectorizer.get_feature_names()
     vocabulary = dict(zip(vocabulary, range(len(vocabulary))))
 
     # get all word embeddings
     print("Getting Glove Embeddings...")
-    embeddings = parser.get_embeddings('vectors_pruned.200.txt.gz', vocabulary)
+    embeddings = parser.get_embeddings('glove.840B.300d.txt', vocabulary)
 
     # train data
     print("Getting 2000 Train Samples...")
@@ -209,13 +206,13 @@ if __name__ == "__main__":
     print("Getting Domain Classification Pairs...")
     domain_train_data = parser.get_domain_train_vectors(idToQuestionsUbuntu, idToQuestionsAndroid, embeddings, len(label_train_data))
     print("Getting Development Samples...")
-    dev_data = parser.get_android_samples('dev.neg.txt', 'dev.pos.txt', embeddings, idToQuestionsAndroid, 2000)
+    dev_data = parser.get_android_samples('dev.neg.txt', 'dev.pos.txt', embeddings, idToQuestionsAndroid, 500)
 
     # Part 2 Milestone 1.a) Unsupervised running on Android dataset
     unsupervised_test(dev_data)
 
     # Part 2 Milestone 1.b)
-    part_one.train_model(idToQuestionsAndroid, embeddings, label_train_data, labelModel, 0.001, 0, 5, 80, True)
+    #part_one_dan.train_model(idToQuestionsAndroid, embeddings, label_train_data, labelModel, 0.0001, 0, 5, 40, True)
 
     # Part 2 Milestine 2
-    train_adversarial_model(idToQuestionsAndroid, embeddings, label_train_data, domain_train_data, labelModel, domainModel, 0.001, 0, 5, 40, 1000)
+    #train_adversarial_model(idToQuestionsAndroid, embeddings, label_train_data, domain_train_data, labelModel, domainModel, 0.001, 0, 8, 40, 500)
