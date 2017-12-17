@@ -48,7 +48,7 @@ def train_model(idToQuestions, embeddings, train_data, model, lr, wd, epochs, ba
             print("TEST")
             testing(model, test_data)
         else:
-            dev_data = parser.get_android_samples('test.neg.txt', 'test.pos.txt', embeddings, idToQuestions, 500)
+            dev_data = parser.get_android_samples('test.neg.txt', 'test.pos.txt', embeddings, idToQuestions, 200)
             part_two.testing_android_eval(model, dev_data)
             part_two.testing_android_auc(model, dev_data)
 
