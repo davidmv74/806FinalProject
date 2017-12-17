@@ -18,7 +18,7 @@ def get_training_vectors(idToQuestions, embeddings):
     with open('train_random.txt', 'r') as f:
         lines = f.readlines()
         random.shuffle(lines)
-        lines = lines[:2000]
+        lines = lines[:4000]
         for line in tqdm(lines):
             splitLine = line.split("\t")
             negatives = splitLine[2][:-1].split(" ")
